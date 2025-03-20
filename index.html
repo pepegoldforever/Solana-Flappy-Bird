@@ -13,10 +13,10 @@
     <!-- Tailwind CSS (Optional) -->
     <script src="https://cdn.tailwindcss.com"></script>
 
-     <!-- Firebase Integration -->
+    <!-- Firebase Integration -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js";
-        import { getFirestore, collection, addDoc, query, orderBy, limit, onSnapshot } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit, onSnapshot } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
         
         // 🔥 Firebase Config (Replace with your own from Firebase Console)
         const firebaseConfig = {
@@ -46,42 +46,60 @@
         // 📌 Function to Load Leaderboard in Real-Time
         function loadLeaderboard() {
             const q = query(collection(db, "leaderboard"), orderBy("score", "desc"), limit(10));
-            const leaderboardList = document.getElementById("leaderboard-list");
             onSnapshot(q, (snapshot) => {
-                leaderboardList.innerHTML = ""; // Clear UI
-                snapshot.forEach((doc, index) => {
-                    let entry = doc.data();
-                    let div = document.createElement("div");
-                    div.className = "leaderboard-entry";
-                    div.innerHTML = `<span>${index + 1}. ${entry.wallet}</span><span>${entry.score}</span>`;
-                    leaderboardList.appendChild(div);
-                });
+                const leaderboardData = snapshot.docs.map((doc, index) => ({
+                    wallet: doc.data().wallet,
+                    score: doc.data().score,
+                    rank: index + 1
+                }));
+                updateLeaderboardUI(leaderboardData);
             });
         }
         
         // 📌 Function to Determine Player's Rank
         async function getPlayerRank(wallet, score) {
             const q = query(collection(db, "leaderboard"), orderBy("score", "desc"));
-            let rank = 1;
             const snapshot = await getDocs(q);
+            let rank = 1;
             snapshot.forEach((doc) => {
                 if (doc.data().score > score) {
                     rank++;
                 }
             });
-            alert(`Game Over! Your score ranked #${rank} on the leaderboard.`);
+            return rank;
+        }
+
+        // 📌 Function to Update Leaderboard UI
+        function updateLeaderboardUI(leaderboardData) {
+            const leaderboardList = document.getElementById("leaderboard-list");
+            if (!leaderboardList) return;
+            leaderboardList.innerHTML = ""; // Clear UI
+            leaderboardData.forEach((entry) => {
+                let div = document.createElement("div");
+                div.className = "leaderboard-entry";
+                div.innerHTML = `<span>${entry.rank}. ${entry.wallet}</span><span>${entry.score}</span>`;
+                leaderboardList.appendChild(div);
+            });
         }
 
         // Modify `updateLeaderboard` function to save score and show ranking
         async function updateLeaderboard(wallet, score) {
             await saveScore(wallet, score);
-            await getPlayerRank(wallet, score);
+            const rank = await getPlayerRank(wallet, score);
+            alert(`Game Over! Your score ranked #${rank} on the leaderboard.`);
         }
 
         // Load leaderboard on page load in real-time
         document.addEventListener("DOMContentLoaded", loadLeaderboard);
     </script>
 </head>
+<body>
+    <div id="root"></div> <!-- React will mount here -->
+    <div id="leaderboard-container" class="text-center mt-5">
+        <h2 class="text-lg font-bold">Leaderboard</h2>
+        <div id="leaderboard-list"></div>
+    </div>
+</body>
 <body>
     <div id="root"></div> <!-- React will mount here -->
 
