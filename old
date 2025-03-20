@@ -1,1 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flappy Bird Game</title>
+
+    <!-- React & ReactDOM from CDN -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+    <!-- Tailwind CSS (Optional) -->
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+    <div id="root"></div> <!-- React will mount here -->
+
+    <!-- Your Game Code -->
+    <script type="text/babel">
+        const { useState, useEffect, useRef } = React;
+
+        function FlappyBirdGame() {
+            const [wallet, setWallet] = useState("");
+            const [isPlaying, setIsPlaying] = useState(false);
+            const [score, setScore] = useState(0);
+            const [leaderboard, setLeaderboard] = useState([]);
+            const [error, setError] = useState("");
+            const gameRef = useRef(null);
+            const pipes = useRef([]);
+            const pipeGap = 120;
+            const pipeWidth = 50;
+            const pipeSpeed = 2;
+            let gameLoop = null;
+            let gameInterval = null;
+
+            useEffect(() => {
+                // Load leaderboard from localStorage on page load
+                const savedLeaderboard = JSON.parse(localStorage.getItem("leaderboard")) || [];
+                setLeaderboard(savedLeaderboard);
+            }, []);
+
+            const resetGame = () => {
+                pipes.current = [];
+                setScore(0);
+                cancelAnimationFrame(gameLoop);
+                clearInterval(gameInterval);
+            };
+
+            const startGame = () => {
+                resetGame();
+                let gravity = 0.6;
+                let velocity = 0;
+                let birdY = 150;
+                let gameScore = 0;
+
+                const canvas = gameRef.current;
+                const ctx = canvas.getContext("2d");
+
+                const createPipe = () => {
+                    let pipeX = canvas.width;
+                    let minHeight = 50;
+                    let maxHeight = canvas.height - pipeGap - minHeight;
+                    let topHeight = Math.random() * (maxHeight - minHeight) + minHeight;
+                    let bottomY = topHeight + pipeGap;
+
+                    pipes.current.push({ x: pipeX, topHeight, bottomY });
+                };
+
+                const updateGame = () => {
+                    velocity += gravity;
+                    birdY += velocity;
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                    ctx.fillStyle = "blue";
+                    ctx.fillRect(50, birdY, 30, 30);
+
+                    pipes.current.forEach((pipe) => {
+                        pipe.x -= pipeSpeed;
+                        ctx.fillStyle = "green";
+                        ctx.fillRect(pipe.x, 0, pipeWidth, pipe.topHeight);
+                        ctx.fillRect(pipe.x, pipe.bottomY, pipeWidth, canvas.height - pipe.bottomY);
+
+                        if (pipe.x + pipeWidth === 50) {
+                            gameScore++;
+                        }
+
+                        if (
+                            (50 < pipe.x + pipeWidth && 50 + 30 > pipe.x && birdY < pipe.topHeight) ||
+                            (50 < pipe.x + pipeWidth && 50 + 30 > pipe.x && birdY + 30 > pipe.bottomY)
+                        ) {
+                            setScore(gameScore);
+                            updateLeaderboard(wallet, gameScore);
+                            setIsPlaying(false);
+                            resetGame();
+                            return;
+                        }
+                    });
+
+                    pipes.current = pipes.current.filter(pipe => pipe.x + pipeWidth > 0);
+                    gameLoop = requestAnimationFrame(updateGame);
+                };
+
+                document.addEventListener("keydown", () => (velocity = -8));
+                createPipe();
+                gameLoop = requestAnimationFrame(updateGame);
+                gameInterval = setInterval(createPipe, 2500);
+            };
+
+            useEffect(() => {
+                if (isPlaying) {
+                    startGame();
+                } else {
+                    resetGame();
+                }
+                return () => resetGame();
+            }, [isPlaying]);
+
+            const updateLeaderboard = (wallet, score) => {
+                if (!wallet) return;
+                
+                let newLeaderboard = [...leaderboard, { wallet, score }];
+                newLeaderboard = newLeaderboard.sort((a, b) => b.score - a.score).slice(0, 10); // Keep top 10 scores
+                setLeaderboard(newLeaderboard);
+                localStorage.setItem("leaderboard", JSON.stringify(newLeaderboard)); // Save to localStorage
+            };
+
+            const isValidBase58 = (address) => {
+                const base58Regex = /^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+$/;
+                return base58Regex.test(address) && address.length >= 32 && address.length <= 44;
+            };
+
+            const handleWalletChange = (e) => {
+                const address = e.target.value;
+                setWallet(address);
+                setError(!isValidBase58(address) ? "ERROR INPUT VALID WALLET ADDRESS" : "");
+            };
+
+            return (
+                <div className="flex flex-col items-center justify-center min-h-screen text-center">
+                    <div className="w-full max-w-lg">
+                        <p className="text-lg font-bold mb-2">
+                            Input your SOL wallet address to start playing, a percentage of the transactions go
+                            towards a prizepool which is then distributed to the top 10 wallet addresses on the
+                            leaderboard. Enjoy!
+                        </p>
+                        <p className="text-lg font-bold mb-2">PRESS SPACEBAR TO FLAP.</p>
+                        <input
+                            value={wallet}
+                            onChange={handleWalletChange}
+                            placeholder="Enter SOL Wallet Address"
+                            className="mb-2 border p-2 w-full"
+                        />
+                        {error && <p className="text-red-500">{error}</p>}
+                        <button
+                            disabled={!wallet || error}
+                            onClick={() => setIsPlaying(true)}
+                            className="bg-blue-500 text-white p-2 rounded mt-2"
+                        >
+                            Play
+                        </button>
+                    </div>
+                    <canvas ref={gameRef} width={400} height={300} className="border mt-4 mx-auto" />
+                    <div className="mt-5 w-full max-w-lg">
+                        <h2 className="text-lg font-bold">Leaderboard</h2>
+                        <ul>
+                            {leaderboard.map((entry, index) => (
+                                <li key={index} className="flex justify-between border-b py-2">
+                                    <span>{entry.wallet}</span>
+                                    <span>{entry.score}</span>
+                                </li>
+                            ))}
+                        </ul>
+                    </div>
+                </div>
+            );
+        }
+
+        ReactDOM.createRoot(document.getElementById("root")).render(<FlappyBirdGame />);
+    </script>
+</body>
+</html>
 
