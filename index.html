@@ -34,6 +34,12 @@
             let gameLoop = null;
             let gameInterval = null;
 
+            useEffect(() => {
+                // Load leaderboard from localStorage on page load
+                const savedLeaderboard = JSON.parse(localStorage.getItem("leaderboard")) || [];
+                setLeaderboard(savedLeaderboard);
+            }, []);
+
             const resetGame = () => {
                 pipes.current = [];
                 setScore(0);
@@ -111,7 +117,12 @@
             }, [isPlaying]);
 
             const updateLeaderboard = (wallet, score) => {
-                setLeaderboard((prev) => [...prev, { wallet, score }].sort((a, b) => b.score - a.score));
+                if (!wallet) return;
+                
+                let newLeaderboard = [...leaderboard, { wallet, score }];
+                newLeaderboard = newLeaderboard.sort((a, b) => b.score - a.score).slice(0, 10); // Keep top 10 scores
+                setLeaderboard(newLeaderboard);
+                localStorage.setItem("leaderboard", JSON.stringify(newLeaderboard)); // Save to localStorage
             };
 
             const isValidBase58 = (address) => {
