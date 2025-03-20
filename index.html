@@ -9,11 +9,20 @@ export default function FlappyBirdGame() {
   const gameRef = useRef(null);
   const gameLoop = useRef(null);
   const pipes = useRef([]);
-  const gapHeight = 120;
+  const pipeGap = 120;
   const pipeWidth = 50;
   const pipeSpeed = 2;
+  let gameInterval;
+
+  const resetGame = () => {
+    pipes.current = [];
+    setScore(0);
+    cancelAnimationFrame(gameLoop.current);
+    clearInterval(gameInterval);
+  };
 
   const startGame = useCallback(() => {
+    resetGame();
     let gravity = 0.6;
     let velocity = 0;
     let birdY = 150;
@@ -21,12 +30,15 @@ export default function FlappyBirdGame() {
 
     const canvas = gameRef.current;
     const ctx = canvas.getContext("2d");
-    pipes.current = [];
 
     const createPipe = () => {
       let pipeX = canvas.width;
-      let pipeHeight = Math.random() * (canvas.height - gapHeight - 50) + 50;
-      pipes.current.push({ x: pipeX, height: pipeHeight });
+      let minHeight = 50;
+      let maxHeight = canvas.height - pipeGap - minHeight;
+      let topHeight = Math.random() * (maxHeight - minHeight) + minHeight;
+      let bottomY = topHeight + pipeGap;
+
+      pipes.current.push({ x: pipeX, topHeight, bottomY });
     };
 
     const updateGame = () => {
@@ -40,20 +52,21 @@ export default function FlappyBirdGame() {
       pipes.current.forEach((pipe, index) => {
         pipe.x -= pipeSpeed;
         ctx.fillStyle = "green";
-        ctx.fillRect(pipe.x, 0, pipeWidth, pipe.height);
-        ctx.fillRect(pipe.x, pipe.height + gapHeight, pipeWidth, canvas.height - pipe.height - gapHeight);
+        ctx.fillRect(pipe.x, 0, pipeWidth, pipe.topHeight);
+        ctx.fillRect(pipe.x, pipe.bottomY, pipeWidth, canvas.height - pipe.bottomY);
 
         if (pipe.x + pipeWidth === 50) {
           gameScore++;
         }
 
         if (
-          (50 < pipe.x + pipeWidth && 50 + 30 > pipe.x && birdY < pipe.height) ||
-          (50 < pipe.x + pipeWidth && 50 + 30 > pipe.x && birdY + 30 > pipe.height + gapHeight)
+          (50 < pipe.x + pipeWidth && 50 + 30 > pipe.x && birdY < pipe.topHeight) ||
+          (50 < pipe.x + pipeWidth && 50 + 30 > pipe.x && birdY + 30 > pipe.bottomY)
         ) {
           setScore(gameScore);
           updateLeaderboard(wallet, gameScore);
           setIsPlaying(false);
+          resetGame();
           return;
         }
       });
@@ -65,16 +78,16 @@ export default function FlappyBirdGame() {
     document.addEventListener("keydown", () => (velocity = -8));
     createPipe();
     gameLoop.current = requestAnimationFrame(updateGame);
-    setInterval(createPipe, 2500);
+    gameInterval = setInterval(createPipe, 2500);
   }, [wallet]);
 
   useEffect(() => {
     if (isPlaying) {
       startGame();
     } else {
-      cancelAnimationFrame(gameLoop.current);
+      resetGame();
     }
-    return () => cancelAnimationFrame(gameLoop.current);
+    return () => resetGame();
   }, [isPlaying, startGame]);
 
   const updateLeaderboard = (wallet, score) => {
