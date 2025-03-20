@@ -12,6 +12,61 @@
 
     <!-- Tailwind CSS (Optional) -->
     <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Firebase Integration -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
+        
+        // 🔥 Firebase Config (Replace with your own from Firebase Console)
+        const firebaseConfig = {
+            apiKey: "AIzaSyDeTlJIpIsUHkSF7vMhNeO_n56S7qi22Dg",
+            authDomain: "solana-flappy.firebaseapp.com",
+            projectId: "solana-flappy",
+            storageBucket: "solana-flappy.firebasestorage.app",
+            messagingSenderId: "460371033969",
+            appId: "1:460371033969:web:4cd08144cfda1d0e2f80d0",
+            measurementId: "G-MYGL5WGM2M"
+        };
+        
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        
+        // 📌 Function to Save Scores to Firestore
+        async function saveScore(wallet, score) {
+            try {
+                await addDoc(collection(db, "leaderboard"), { wallet, score });
+                console.log("Score Saved!");
+                loadLeaderboard();
+            } catch (e) {
+                console.error("Error adding document: ", e);
+            }
+        }
+
+        // 📌 Function to Load Leaderboard from Firestore
+        async function loadLeaderboard() {
+            const q = query(collection(db, "leaderboard"), orderBy("score", "desc"), limit(10));
+            const querySnapshot = await getDocs(q);
+            const leaderboardList = document.getElementById("leaderboard-list");
+            leaderboardList.innerHTML = ""; // Clear UI
+            querySnapshot.forEach((doc) => {
+                let entry = doc.data();
+                let div = document.createElement("div");
+                div.className = "leaderboard-entry";
+                div.innerHTML = `<span>${entry.wallet}</span><span>${entry.score}</span>`;
+                leaderboardList.appendChild(div);
+            });
+        }
+        
+        // Modify `updateLeaderboard` function to save to Firestore
+        function updateLeaderboard(wallet, score) {
+            saveScore(wallet, score); // Save the score
+        }
+
+        // Load leaderboard on page load
+        document.addEventListener("DOMContentLoaded", loadLeaderboard);
+    </script>
 </head>
 <body>
     <div id="root"></div> <!-- React will mount here -->
