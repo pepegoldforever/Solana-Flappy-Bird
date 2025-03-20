@@ -13,10 +13,10 @@
     <!-- Tailwind CSS (Optional) -->
     <script src="https://cdn.tailwindcss.com"></script>
 
-    <!-- Firebase Integration -->
+     <!-- Firebase Integration -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-app.js";
-        import { getFirestore, collection, addDoc, getDocs, query, orderBy, limit } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
+        import { getFirestore, collection, addDoc, query, orderBy, limit, onSnapshot } from "https://www.gstatic.com/firebasejs/9.6.10/firebase-firestore.js";
         
         // 🔥 Firebase Config (Replace with your own from Firebase Console)
         const firebaseConfig = {
@@ -38,33 +38,47 @@
             try {
                 await addDoc(collection(db, "leaderboard"), { wallet, score });
                 console.log("Score Saved!");
-                loadLeaderboard();
             } catch (e) {
                 console.error("Error adding document: ", e);
             }
         }
 
-        // 📌 Function to Load Leaderboard from Firestore
-        async function loadLeaderboard() {
+        // 📌 Function to Load Leaderboard in Real-Time
+        function loadLeaderboard() {
             const q = query(collection(db, "leaderboard"), orderBy("score", "desc"), limit(10));
-            const querySnapshot = await getDocs(q);
             const leaderboardList = document.getElementById("leaderboard-list");
-            leaderboardList.innerHTML = ""; // Clear UI
-            querySnapshot.forEach((doc) => {
-                let entry = doc.data();
-                let div = document.createElement("div");
-                div.className = "leaderboard-entry";
-                div.innerHTML = `<span>${entry.wallet}</span><span>${entry.score}</span>`;
-                leaderboardList.appendChild(div);
+            onSnapshot(q, (snapshot) => {
+                leaderboardList.innerHTML = ""; // Clear UI
+                snapshot.forEach((doc, index) => {
+                    let entry = doc.data();
+                    let div = document.createElement("div");
+                    div.className = "leaderboard-entry";
+                    div.innerHTML = `<span>${index + 1}. ${entry.wallet}</span><span>${entry.score}</span>`;
+                    leaderboardList.appendChild(div);
+                });
             });
         }
         
-        // Modify `updateLeaderboard` function to save to Firestore
-        function updateLeaderboard(wallet, score) {
-            saveScore(wallet, score); // Save the score
+        // 📌 Function to Determine Player's Rank
+        async function getPlayerRank(wallet, score) {
+            const q = query(collection(db, "leaderboard"), orderBy("score", "desc"));
+            let rank = 1;
+            const snapshot = await getDocs(q);
+            snapshot.forEach((doc) => {
+                if (doc.data().score > score) {
+                    rank++;
+                }
+            });
+            alert(`Game Over! Your score ranked #${rank} on the leaderboard.`);
         }
 
-        // Load leaderboard on page load
+        // Modify `updateLeaderboard` function to save score and show ranking
+        async function updateLeaderboard(wallet, score) {
+            await saveScore(wallet, score);
+            await getPlayerRank(wallet, score);
+        }
+
+        // Load leaderboard on page load in real-time
         document.addEventListener("DOMContentLoaded", loadLeaderboard);
     </script>
 </head>
