@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 export default function FlappyBirdGame() {
   const [wallet, setWallet] = useState("");
@@ -7,27 +7,26 @@ export default function FlappyBirdGame() {
   const [leaderboard, setLeaderboard] = useState([]);
   const [error, setError] = useState("");
   const gameRef = useRef(null);
+  const gameLoop = useRef(null);
+  const pipes = useRef([]);
+  const gapHeight = 120;
+  const pipeWidth = 50;
+  const pipeSpeed = 2;
 
-  useEffect(() => {
-    if (isPlaying) startGame();
-  }, [isPlaying]);
-
-  const startGame = () => {
-    let gravity = 0.5;
+  const startGame = useCallback(() => {
+    let gravity = 0.6;
     let velocity = 0;
     let birdY = 150;
-    let pipes = [];
     let gameScore = 0;
-    let gameInterval;
-    let pipeInterval;
 
     const canvas = gameRef.current;
     const ctx = canvas.getContext("2d");
+    pipes.current = [];
 
     const createPipe = () => {
-      let pipeX = 400;
-      let pipeHeight = Math.random() * 150 + 50;
-      pipes.push({ x: pipeX, height: pipeHeight });
+      let pipeX = canvas.width;
+      let pipeHeight = Math.random() * (canvas.height - gapHeight - 50) + 50;
+      pipes.current.push({ x: pipeX, height: pipeHeight });
     };
 
     const updateGame = () => {
@@ -38,30 +37,45 @@ export default function FlappyBirdGame() {
       ctx.fillStyle = "blue";
       ctx.fillRect(50, birdY, 30, 30);
 
-      pipes.forEach((pipe, index) => {
-        pipe.x -= 2;
+      pipes.current.forEach((pipe, index) => {
+        pipe.x -= pipeSpeed;
         ctx.fillStyle = "green";
-        ctx.fillRect(pipe.x, 0, 40, pipe.height);
-        ctx.fillRect(pipe.x, pipe.height + 100, 40, 300 - pipe.height);
+        ctx.fillRect(pipe.x, 0, pipeWidth, pipe.height);
+        ctx.fillRect(pipe.x, pipe.height + gapHeight, pipeWidth, canvas.height - pipe.height - gapHeight);
 
-        if (pipe.x === 50) gameScore++;
+        if (pipe.x + pipeWidth === 50) {
+          gameScore++;
+        }
+
         if (
-          (50 < pipe.x + 40 && 50 + 30 > pipe.x && birdY < pipe.height) ||
-          (50 < pipe.x + 40 && 50 + 30 > pipe.x && birdY + 30 > pipe.height + 100)
+          (50 < pipe.x + pipeWidth && 50 + 30 > pipe.x && birdY < pipe.height) ||
+          (50 < pipe.x + pipeWidth && 50 + 30 > pipe.x && birdY + 30 > pipe.height + gapHeight)
         ) {
-          clearInterval(gameInterval);
-          clearInterval(pipeInterval);
           setScore(gameScore);
           updateLeaderboard(wallet, gameScore);
           setIsPlaying(false);
+          return;
         }
       });
+
+      pipes.current = pipes.current.filter(pipe => pipe.x + pipeWidth > 0);
+      gameLoop.current = requestAnimationFrame(updateGame);
     };
 
-    document.addEventListener("keydown", () => (velocity = -7));
-    gameInterval = setInterval(updateGame, 20);
-    pipeInterval = setInterval(createPipe, 2000);
-  };
+    document.addEventListener("keydown", () => (velocity = -8));
+    createPipe();
+    gameLoop.current = requestAnimationFrame(updateGame);
+    setInterval(createPipe, 2500);
+  }, [wallet]);
+
+  useEffect(() => {
+    if (isPlaying) {
+      startGame();
+    } else {
+      cancelAnimationFrame(gameLoop.current);
+    }
+    return () => cancelAnimationFrame(gameLoop.current);
+  }, [isPlaying, startGame]);
 
   const updateLeaderboard = (wallet, score) => {
     setLeaderboard((prev) => [...prev, { wallet, score }].sort((a, b) => b.score - a.score));
@@ -75,11 +89,7 @@ export default function FlappyBirdGame() {
   const handleWalletChange = (e) => {
     const address = e.target.value;
     setWallet(address);
-    if (!isValidBase58(address)) {
-      setError("ERROR INPUT VALID WALLET ADDRESS");
-    } else {
-      setError("");
-    }
+    setError(!isValidBase58(address) ? "ERROR INPUT VALID WALLET ADDRESS" : "");
   };
 
   return (
@@ -90,7 +100,6 @@ export default function FlappyBirdGame() {
           towards a prizepool which is then distributed to the top 10 wallet addresses on the
           leaderboard. Enjoy!
         </p>
-        <p></p>
         <p className="text-lg font-bold mb-2">PRESS SPACEBAR TO FLAP.</p>
         <input
           value={wallet}
@@ -99,7 +108,11 @@ export default function FlappyBirdGame() {
           className="mb-2 border p-2 w-full"
         />
         {error && <p className="text-red-500">{error}</p>}
-        <button disabled={!wallet || error} onClick={() => setIsPlaying(true)} className="bg-blue-500 text-white p-2 rounded mt-2">
+        <button
+          disabled={!wallet || error}
+          onClick={() => setIsPlaying(true)}
+          className="bg-blue-500 text-white p-2 rounded mt-2"
+        >
           Play
         </button>
       </div>
