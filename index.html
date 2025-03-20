@@ -1,120 +1,176 @@
-import { useState, useEffect, useRef } from "react";
-
-export default function FlappyBirdGame() {
-  const [wallet, setWallet] = useState("");
-  const [isPlaying, setIsPlaying] = useState(false);
-  const [score, setScore] = useState(0);
-  const [leaderboard, setLeaderboard] = useState([]);
-  const [error, setError] = useState("");
-  const gameRef = useRef(null);
-
-  useEffect(() => {
-    if (isPlaying) startGame();
-  }, [isPlaying]);
-
-  const startGame = () => {
-    let gravity = 0.5;
-    let velocity = 0;
-    let birdY = 150;
-    let pipes = [];
-    let gameScore = 0;
-    let gameInterval;
-    let pipeInterval;
-
-    const canvas = gameRef.current;
-    const ctx = canvas.getContext("2d");
-
-    const createPipe = () => {
-      let pipeX = 400;
-      let pipeHeight = Math.random() * 150 + 50;
-      pipes.push({ x: pipeX, height: pipeHeight });
-    };
-
-    const updateGame = () => {
-      velocity += gravity;
-      birdY += velocity;
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      ctx.fillStyle = "blue";
-      ctx.fillRect(50, birdY, 30, 30);
-
-      pipes.forEach((pipe, index) => {
-        pipe.x -= 2;
-        ctx.fillStyle = "green";
-        ctx.fillRect(pipe.x, 0, 40, pipe.height);
-        ctx.fillRect(pipe.x, pipe.height + 100, 40, 300 - pipe.height);
-
-        if (pipe.x === 50) gameScore++;
-        if (
-          (50 < pipe.x + 40 && 50 + 30 > pipe.x && birdY < pipe.height) ||
-          (50 < pipe.x + 40 && 50 + 30 > pipe.x && birdY + 30 > pipe.height + 100)
-        ) {
-          clearInterval(gameInterval);
-          clearInterval(pipeInterval);
-          setScore(gameScore);
-          updateLeaderboard(wallet, gameScore);
-          setIsPlaying(false);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flappy Bird Web3</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            text-align: center;
+            background-color: #f0f0f0;
         }
-      });
-    };
+        #game-container {
+            margin-top: 20px;
+        }
+        canvas {
+            border: 2px solid black;
+            background-color: skyblue;
+            display: block;
+            margin: 0 auto;
+        }
+        #wallet-container {
+            margin-top: 20px;
+        }
+        input {
+            padding: 10px;
+            width: 300px;
+            border: 2px solid black;
+        }
+        button {
+            padding: 10px 20px;
+            background-color: blue;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:disabled {
+            background-color: gray;
+            cursor: not-allowed;
+        }
+        #error-message {
+            color: red;
+            font-weight: bold;
+        }
+        #leaderboard {
+            margin-top: 20px;
+        }
+        .leaderboard-entry {
+            display: flex;
+            justify-content: space-between;
+            border-bottom: 1px solid gray;
+            padding: 5px;
+        }
+    </style>
+</head>
+<body>
 
-    document.addEventListener("keydown", () => (velocity = -7));
-    gameInterval = setInterval(updateGame, 20);
-    pipeInterval = setInterval(createPipe, 2000);
-  };
+    <h1>Flappy Bird Web3</h1>
+    <p>Input your SOL wallet address to start playing. A percentage of each transaction goes towards a prizepool which is then distributed to the top 10 wallet addresses on the leaderboard. Enjoy!</p>
+    <p><strong>PRESS SPACEBAR TO FLAP</strong></p>
 
-  const updateLeaderboard = (wallet, score) => {
-    setLeaderboard((prev) => [...prev, { wallet, score }].sort((a, b) => b.score - a.score));
-  };
-
-  const isValidBase58 = (address) => {
-    const base58Regex = /^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+$/;
-    return base58Regex.test(address) && address.length >= 32 && address.length <= 44;
-  };
-
-  const handleWalletChange = (e) => {
-    const address = e.target.value;
-    setWallet(address);
-    if (!isValidBase58(address)) {
-      setError("ERROR INPUT VALID WALLET ADDRESS");
-    } else {
-      setError("");
-    }
-  };
-
-  return (
-    <div className="flex flex-col items-center justify-center min-h-screen text-center">
-      <div className="w-full max-w-lg">
-        <p className="text-lg font-bold mb-2">
-          Input your SOL wallet address to start playing, a percentage of each transaction goes
-          towards a prizepool which is then distributed to the top 10 wallet addresses on the
-          leaderboard. Enjoy!
-        </p>
-        <p></p>
-        <p className="text-lg font-bold mb-2">PRESS SPACEBAR TO FLAP.</p>
-        <input
-          value={wallet}
-          onChange={handleWalletChange}
-          placeholder="Enter SOL Wallet Address"
-          className="mb-2 border p-2 w-full"
-        />
-        {error && <p className="text-red-500">{error}</p>}
-        <button disabled={!wallet || error} onClick={() => setIsPlaying(true)} className="bg-blue-500 text-white p-2 rounded mt-2">
-          Play
-        </button>
-      </div>
-      <canvas ref={gameRef} width={400} height={300} className="border mt-4 mx-auto" />
-      <div className="mt-5 w-full max-w-lg">
-        <h2 className="text-lg font-bold">Leaderboard</h2>
-        <ul>
-          {leaderboard.map((entry, index) => (
-            <li key={index} className="flex justify-between border-b py-2">
-              <span>{entry.wallet}</span>
-              <span>{entry.score}</span>
-            </li>
-          ))}
-        </ul>
-      </div>
+    <div id="wallet-container">
+        <input type="text" id="wallet" placeholder="Enter SOL Wallet Address">
+        <p id="error-message"></p>
+        <button id="play-button" disabled>Play</button>
     </div>
-  );
-}
+
+    <div id="game-container">
+        <canvas id="gameCanvas" width="400" height="300"></canvas>
+    </div>
+
+    <div id="leaderboard">
+        <h2>Leaderboard</h2>
+        <div id="leaderboard-list"></div>
+    </div>
+
+    <script>
+        let walletInput = document.getElementById("wallet");
+        let playButton = document.getElementById("play-button");
+        let errorMessage = document.getElementById("error-message");
+        let leaderboardList = document.getElementById("leaderboard-list");
+
+        let isPlaying = false;
+        let score = 0;
+        let leaderboard = [];
+
+        function isValidBase58(address) {
+            const base58Regex = /^[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+$/;
+            return base58Regex.test(address) && address.length >= 32 && address.length <= 44;
+        }
+
+        walletInput.addEventListener("input", () => {
+            let address = walletInput.value;
+            if (!isValidBase58(address)) {
+                errorMessage.innerText = "ERROR INPUT VALID WALLET ADDRESS";
+                playButton.disabled = true;
+            } else {
+                errorMessage.innerText = "";
+                playButton.disabled = false;
+            }
+        });
+
+        playButton.addEventListener("click", () => {
+            isPlaying = true;
+            startGame();
+        });
+
+        function startGame() {
+            let canvas = document.getElementById("gameCanvas");
+            let ctx = canvas.getContext("2d");
+            let gravity = 0.5;
+            let velocity = 0;
+            let birdY = 150;
+            let pipes = [];
+            let gameInterval, pipeInterval;
+
+            function createPipe() {
+                let pipeX = 400;
+                let pipeHeight = Math.random() * 150 + 50;
+                pipes.push({ x: pipeX, height: pipeHeight });
+            }
+
+            function updateGame() {
+                velocity += gravity;
+                birdY += velocity;
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                ctx.fillStyle = "blue";
+                ctx.fillRect(50, birdY, 30, 30);
+
+                pipes.forEach((pipe, index) => {
+                    pipe.x -= 2;
+                    ctx.fillStyle = "green";
+                    ctx.fillRect(pipe.x, 0, 40, pipe.height);
+                    ctx.fillRect(pipe.x, pipe.height + 100, 40, 300 - pipe.height);
+
+                    if (pipe.x === 50) score++;
+                    if (
+                        (50 < pipe.x + 40 && 50 + 30 > pipe.x && birdY < pipe.height) ||
+                        (50 < pipe.x + 40 && 50 + 30 > pipe.x && birdY + 30 > pipe.height + 100)
+                    ) {
+                        clearInterval(gameInterval);
+                        clearInterval(pipeInterval);
+                        updateLeaderboard(walletInput.value, score);
+                        isPlaying = false;
+                    }
+                });
+
+                if (birdY > canvas.height || birdY < 0) {
+                    clearInterval(gameInterval);
+                    clearInterval(pipeInterval);
+                    updateLeaderboard(walletInput.value, score);
+                    isPlaying = false;
+                }
+            }
+
+            document.addEventListener("keydown", () => (velocity = -7));
+            gameInterval = setInterval(updateGame, 20);
+            pipeInterval = setInterval(createPipe, 2000);
+        }
+
+        function updateLeaderboard(wallet, score) {
+            leaderboard.push({ wallet, score });
+            leaderboard.sort((a, b) => b.score - a.score);
+            leaderboardList.innerHTML = "";
+            leaderboard.forEach(entry => {
+                let div = document.createElement("div");
+                div.className = "leaderboard-entry";
+                div.innerHTML = `<span>${entry.wallet}</span><span>${entry.score}</span>`;
+                leaderboardList.appendChild(div);
+            });
+        }
+    </script>
+
+</body>
+</html>
